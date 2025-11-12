@@ -128,7 +128,7 @@ void setLEDs(int band)
     }
 }
 
-/* Delay function (simple busy-wait) */
+/* Delay function (simple busy-wait) **/
 void delay_ms(uint32_t ms)
 {
     volatile uint32_t i, j;
