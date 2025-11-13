@@ -10,6 +10,7 @@
 #define NUM_SAMPLES  44100  // 1 second
 
 /* === Paste your audio samples here === */
+#pragma DATA_SECTION(sound_samples, ".audiobuffer")
 const float sound_samples[NUM_SAMPLES] = {
 0.611602f,
 0.455138f,
