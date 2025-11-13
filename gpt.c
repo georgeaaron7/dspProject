@@ -3,6 +3,7 @@
 #include "DSPF_sp_fftSPxSP.h"
 #include "platform.h"
 #include "gpio_api.h"
+#include "twiddle.h"
 
 #define FRAME_SIZE   1024
 #define SAMPLE_RATE  44100
@@ -44127,19 +44128,34 @@ void loadNextFrame(void);
 void update_leds(void);
 
 void init_window(void) {
-    for (int i = 0; i < FRAME_SIZE; i++)
+    int i;
+    for (i = 0; i < FRAME_SIZE; i++)
         window[i] = 0.54f - 0.46f * cosf(2 * M_PI * i / (FRAME_SIZE - 1));
 }
 
 void loadNextFrame(void) {
-    for (int i = 0; i < FRAME_SIZE; i++)
+    int i;
+    for (i = 0; i < FRAME_SIZE; i++)
         fftInput[i] = sound_samples[(sampleIndex + i) % NUM_SAMPLES] * window[i];
     sampleIndex = (sampleIndex + FRAME_SIZE) % NUM_SAMPLES;
 }
 
 void compute_fft(void) {
-    DSPF_sp_fftSPxSP(FRAME_SIZE, fftInput, twiddle, fftOutput, 0, FRAME_SIZE);
-    for (int k = 0; k < FRAME_SIZE/2; k++) {
+    unsigned char brev[64] = {
+      0,32,16,48,8,40,24,56,
+      4,36,20,52,12,44,28,60,
+      2,34,18,50,10,42,26,58,
+      6,38,22,54,14,46,30,62,
+      1,33,17,49,9,41,25,57,
+      5,37,21,53,13,45,29,61,
+      3,35,19,51,11,43,27,59,
+      7,39,23,55,15,47,31,63
+    };
+//    DSPF_sp_fftSPxSP(FRAME_SIZE, fftInput, twiddle, fftOutput, 0, FRAME_SIZE);
+    DSPF_sp_fftSPxSP(FRAME_SIZE,fftInput,twiddle,fftOutput,brev,4,0,FRAME_SIZE);
+
+    int k;
+    for (k = 0; k < FRAME_SIZE/2; k++) {
         float re = fftOutput[2*k];
         float im = fftOutput[2*k + 1];
         magnitude[k] = sqrtf(re*re + im*im);
@@ -44148,12 +44164,24 @@ void compute_fft(void) {
 
 void update_leds(void) {
     float low=0, mid=0, high=0;
-    for (int i = 0; i < FRAME_SIZE/2; i++) {
+    int i;
+    for (i = 0; i < FRAME_SIZE/2; i++) {
         float freq = (float)i * SAMPLE_RATE / FRAME_SIZE;
         if (freq < 500) low += magnitude[i];
         else if (freq < 2000) mid += magnitude[i];
         else high += magnitude[i];
     }
+#define GPIO_BANK_LED0   0
+#define GPIO_PIN_LED0    8
+
+#define GPIO_BANK_LED1   0
+#define GPIO_PIN_LED1    9
+
+#define GPIO_BANK_LED2   0
+#define GPIO_PIN_LED2    10
+
+#define GPIO_BANK_LED3   0
+#define GPIO_PIN_LED3    11
 
     GPIO_setOutput(GPIO_BANK_LED0, GPIO_PIN_LED0, (low  > 5000));
     GPIO_setOutput(GPIO_BANK_LED1, GPIO_PIN_LED1, (mid  > 5000));
@@ -44163,12 +44191,12 @@ void update_leds(void) {
 int main(void) {
     platform_init();
     GPIO_init();
-    gen_twiddle_fft_sp(twiddle, FRAME_SIZE);
+    generate_twiddle(twiddle, FRAME_SIZE);
     init_window();
-
-    while (1) {
+    while(1) {
         loadNextFrame();
         compute_fft();
         update_leds();
     }
 }
+
